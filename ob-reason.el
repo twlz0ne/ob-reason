@@ -32,15 +32,15 @@
 
 ;;; Requirements:
 
-;; - tuareg-mode :: http://www-rocq.inria.fr/~acohen/tuareg/
+;; - reason-mode :: http://www-rocq.inria.fr/~acohen/reason/
 
 ;;; Code:
 (require 'ob)
 (require 'comint)
 (require 'org-macs)
 
-(declare-function tuareg-run-ocaml "ext:tuareg" ())
-(declare-function tuareg-interactive-send-input "ext:tuareg" ())
+(declare-function reason-run-ocaml "ext:reason" ())
+(declare-function reason-interactive-send-input "ext:reason" ())
 
 (defvar org-babel-tangle-lang-exts)
 (add-to-list 'org-babel-tangle-lang-exts '("reason" . "re"))
@@ -70,7 +70,7 @@
 		 (concat
 		  (org-babel-chomp full-body) ";\n"
 		  org-babel-reason-eoe-indicator))
-		(tuareg-interactive-send-input)))
+		(reason-interactive-send-input)))
 	 (clean
 	  (car (let ((re (regexp-quote org-babel-reason-eoe-output)) out)
 		 (delq nil (mapcar (lambda (line)
@@ -103,31 +103,18 @@
 
 (defun org-babel-prep-session:reason (session _params)
   "Prepare SESSION according to the header arguments in PARAMS."
-  (require 'tuareg)
-
-  (define-advice tuareg-interactive-send-input (:override () override)
-    "Send the current phrase to the OCaml REPL or insert a newline.
-If the point is next to \";\", the phrase is sent to the REPL,
-otherwise a newline is inserted and the lines are indented."
-    (interactive)
-    (cond
-     ((tuareg-in-literal-or-comment-p) (tuareg-interactive--indent-line))
-     ((or (equal ";" (save-excursion (nth 2 (smie-backward-sexp))))
-          (looking-at-p "[ \t\n\r]*;"))
-      (comint-send-input))
-     (t (tuareg-interactive--indent-line))))
-
+  (require 'reason-reactive)
   (add-to-list 'exec-path "~/.nodenv/shims")
-  (let ((tuareg-interactive-program org-babel-reason-command)
-        (tuareg-interactive-buffer-name (if (and (not (string= session "none"))
+  (let ((reason-interactive-program org-babel-reason-command)
+        (reason-interactive-buffer-name (if (and (not (string= session "none"))
                                                  (not (string= session "default"))
                                                  (stringp session))
                                             session
-                                          tuareg-interactive-buffer-name)))
+                                          reason-interactive-buffer-name)))
     (save-window-excursion (if (fboundp 'reason-run-process-if-needed)
 	 (reason-run-process-if-needed org-babel-reason-command)
-       (tuareg-run-ocaml)))
-    (get-buffer tuareg-interactive-buffer-name)))
+       (reason-run-ocaml)))
+    (get-buffer reason-interactive-buffer-name)))
 
 (defun org-babel-variable-assignments:reason (params)
   "Return list of reason statements assigning the block's variables."
