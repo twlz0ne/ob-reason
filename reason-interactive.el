@@ -1,5 +1,49 @@
 (require 'comint)
 
+(defcustom reason-interactive-scroll-to-bottom-on-output nil
+  "*Controls when to scroll to the bottom of the interactive buffer
+upon evaluating an expression.
+
+See `comint-scroll-to-bottom-on-output' for details."
+  :group 'reason :type 'boolean
+  :set (lambda (var val)
+         (set-default var val)
+         (when (boundp 'comint-scroll-to-bottom-on-output)
+           (dolist (buf (buffer-list))
+             (with-current-buffer buf
+               (when (derived-mode-p 'reason-interactive-mode)
+                 (setq-local comint-scroll-to-bottom-on-output val)))))))
+
+(defcustom reason-interactive-read-only-input nil
+  "*Non-nil means input sent to the ReasonML REPL is read-only."
+  :group 'reason :type 'boolean)
+
+(defcustom reason-interactive-echo-phrase t
+  "*Non-nil means echo phrases in the REPL buffer when sending
+them to the ReasonML REPL."
+  :group 'reason :type 'boolean)
+
+(defcustom reason-interactive-input-font-lock t
+  "*Non nil means Font-Lock for REPL input phrases."
+  :group 'reason :type 'boolean)
+
+(defcustom reason-interactive-output-font-lock t
+  "*Non nil means Font-Lock for REPL output messages."
+  :group 'reason :type 'boolean)
+
+(defcustom reason-interactive-error-font-lock t
+  "*Non nil means Font-Lock for REPL error messages."
+  :group 'reason :type 'boolean)
+
+(defcustom reason-skip-after-eval-phrase t
+  "*Non-nil means skip to the end of the phrase after evaluation in the
+ReasonML REPL."
+  :group 'reason :type 'boolean)
+
+(defun reason-in-literal-or-comment-p (&optional pos)
+  "Return non-nil if point is inside an ReasonML literal or comment."
+  (nth 8 (syntax-ppss pos)))
+
 (defvar reason-interactive-options-list
   '(("Skip phrase after evaluation" . 'reason-skip-after-eval-phrase)
     ("Echo phrase in interactive buffer" . 'reason-interactive-echo-phrase)
@@ -118,27 +162,29 @@ be sent from another buffer in reason mode.
 
 Short cuts for interactions with the REPL:
 \\{reason-interactive-mode-map}"
-  (add-hook 'comint-output-filter-functions #'reason-interactive-filter)
+  ;;;---
+  ;; (add-hook 'comint-output-filter-functions #'reason-interactive-filter)
   (setq comint-prompt-regexp "^#  *")
   (setq comint-process-echoes nil)
   (setq comint-get-old-input 'reason-interactive-get-old-input)
   (setq comint-scroll-to-bottom-on-output
         reason-interactive-scroll-to-bottom-on-output)
   (set-syntax-table reason-mode-syntax-table)
-  (setq-local comment-start "(* ")
-  (setq-local comment-end " *)")
+  (setq-local comment-start "/* ")
+  (setq-local comment-end " */")
   (setq-local comment-start-skip "(\\*+[ \t]*")
   (setq-local comint-prompt-read-only t)
 
-  (reason--common-mode-setup)
-  (reason--install-font-lock t)
+  ;; (reason--common-mode-setup)
+  ;; (reason--install-font-lock t)
   (when (or reason-interactive-input-font-lock
             reason-interactive-output-font-lock
             reason-interactive-error-font-lock)
     (font-lock-mode 1))
 
   (easy-menu-add reason-interactive-mode-menu)
-  (reason-update-options-menu))
+  ;; (reason-update-options-menu)
+  )
 
 ;;;###autoload
 (defun reason-run-reason ()
@@ -189,7 +235,7 @@ I/O via buffer `*ReasonML*'."
       (buffer-substring-no-properties (point) end))))
 
 (defconst reason-interactive--send-warning
-  "Note: REPL processing requires a terminating `;;', or use S-return.")
+  "Note: REPL processing requires a terminating `;', or use S-return.")
 
 (defun reason-interactive--indent-line ()
   (insert "\n")
@@ -198,21 +244,29 @@ I/O via buffer `*ReasonML*'."
 
 (defun reason-interactive-send-input ()
   "Send the current phrase to the ReasonML REPL or insert a newline.
-If the point is next to \";;\", the phrase is sent to the REPL,
+If the point is next to \";\", the phrase is sent to the REPL,
 otherwise a newline is inserted and the lines are indented."
   (interactive)
   (cond
    ((reason-in-literal-or-comment-p) (reason-interactive--indent-line))
-   ((or (equal ";;" (save-excursion (nth 2 (smie-backward-sexp))))
-        (looking-at-p "[ \t\n\r]*;;"))
+   (;;;---
+    ;; (or (equal ";" (save-excursion (nth 2 (smie-backward-sexp))))
+    ;;     (looking-at-p "[ \t\n\r]*;"))
+    ;;;+++
+    (looking-at-p "[ \t\n\r]*;")
     (comint-send-input))
-   (t (reason-interactive--indent-line))))
+   (t
+    ;;;---
+    ;; (reason-interactive--indent-line)
+    ;;;+++
+    (reason-interactive-send-input-end-of-phrase))))
 
 (defun reason-interactive-send-input-end-of-phrase ()
   (interactive)
   (goto-char (point-max))
-  (unless (equal ";;" (save-excursion (nth 2 (smie-backward-sexp))))
-    (insert ";;"))
+  ;;;---
+  ;; (unless (equal ";" (save-excursion (nth 2 (smie-backward-sexp))))
+  ;;   (insert ";"))
   (comint-send-input))
 
 (defun reason-interactive--send-region (start end)
@@ -221,9 +275,9 @@ It is assumed that the range START-END delimit valid ReasonML phrases."
   (save-excursion (reason-run-process-if-needed))
   (comint-preinput-scroll-to-bottom)
   (let* ((phrases (buffer-substring-no-properties start end))
-         (phrases (replace-regexp-in-string "[ \t\n]*\\(;;[ \t\n]*\\)?\\'" ""
+         (phrases (replace-regexp-in-string "[ \t\n]*\\(;[ \t\n]*\\)?\\'" ""
                                             phrases))
-         (phrases-colon (concat phrases ";;")))
+         (phrases-colon (concat phrases ";")))
     (if (string= phrases "")
         (message "Cannot send empty commands to ReasonML REPL!")
       (with-current-buffer reason-interactive-buffer-name
@@ -260,8 +314,8 @@ It is assumed that the range START-END delimit valid ReasonML phrases."
         (narrow-to-region (nth 0 phrase) (nth 1 phrase)))))
 
 (defun reason--after-double-colon ()
-  "Non nil if the current position is after or inside ';;'.  In
-this case, the returned value is the position before ';;' (unless
+  "Non nil if the current position is after or inside ';'.  In
+this case, the returned value is the position before ';' (unless
 it is the first position of the buffer)."
   (save-excursion
     (when (looking-at-p "[;[:blank:]]*$")

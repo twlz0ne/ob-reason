@@ -1,4 +1,4 @@
-;;; ob-reason.el --- Babel Functions for Reason        -*- lexical-binding: t; -*-
+;;; ob-reason.el --- Babel Functions for ReasonML        -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2009-2019 Free Software Foundation, Inc.
 
@@ -43,7 +43,7 @@
 (declare-function reason-interactive-send-input "ext:reason" ())
 
 (defvar org-babel-tangle-lang-exts)
-(add-to-list 'org-babel-tangle-lang-exts '("reason" . "re"))
+(add-to-list 'org-babel-tangle-lang-exts '("reason-mode" . "re"))
 
 (defvar org-babel-default-header-args:reason '())
 
@@ -51,14 +51,14 @@
 (defvar org-babel-reason-eoe-output "org-babel-reason-eoe")
 
 (defcustom org-babel-reason-command "rtop"
-  "Name of the command for executing Reason code."
+  "Name of the command for executing ReasonML code."
   :version "24.4"
   :package-version '(Org . "8.0")
   :group 'org-babel
   :type 'string)
 
 (defun org-babel-execute:reason (body params)
-  "Execute a block of Reason code with Babel."
+  "Execute a block of ReasonML code with Babel."
   (let* ((full-body (org-babel-expand-body:generic
 		     body params
 		     (org-babel-variable-assignments:reason params)))
@@ -68,10 +68,10 @@
 		  (session org-babel-reason-eoe-output nil full-body)
 		(insert
 		 (concat
-		  (org-babel-chomp full-body) ";\n"
+		  (org-babel-chomp full-body) "\n"
 		  org-babel-reason-eoe-indicator))
 		(reason-interactive-send-input)))
-	 (clean
+         (clean
 	  (car (let ((re (regexp-quote org-babel-reason-eoe-output)) out)
 		 (delq nil (mapcar (lambda (line)
 				     (if out
@@ -103,8 +103,7 @@
 
 (defun org-babel-prep-session:reason (session _params)
   "Prepare SESSION according to the header arguments in PARAMS."
-  (require 'reason-reactive)
-  (add-to-list 'exec-path "~/.nodenv/shims")
+  (require 'reason-interactive)
   (let ((reason-interactive-program org-babel-reason-command)
         (reason-interactive-buffer-name (if (and (not (string= session "none"))
                                                  (not (string= session "default"))
@@ -165,7 +164,5 @@ Emacs-lisp table, otherwise return the results as a string."
 			    "; " "," results)))))
 
 (provide 'ob-reason)
-
-
 
 ;;; ob-reason.el ends here
