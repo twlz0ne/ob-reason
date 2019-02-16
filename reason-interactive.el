@@ -216,7 +216,8 @@ I/O via buffer `*ReasonML*'."
           (process-connection-type nil))
       (set-buffer (apply (function make-comint) "ReasonML"
                          (car cmdlist) nil (cdr cmdlist)))
-      (reason-interactive-mode)
+      ;;;---
+      ;; (reason-interactive-mode)
       (sleep-for 1))))
 
 (defun reason--split-args (args)
